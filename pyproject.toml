@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "refcalendar"
+version = "0.1.0"
+description = "Fetch and parse DHB referee assignments"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "beautifulsoup4>=4.12",
+    "python-dotenv>=1.0",
+    "requests>=2.31",
+]
+authors = [{ name = "Oscar Lohse", email = "oscarlohse@gmx.de" }]
+
+[tool.setuptools]
+package-dir = {"" = "python"}
+py-modules = [
+    "env_handler",
+    "game_data",
+    "game_to_json",
+    "get_games",
+    "html_to_data",
+    "main",
+]
+
+[tool.ruff]
+line-length = 200
+indent-width = 4
+target-version = "py310"
+
+[tool.ruff.lint]
+# enable all linter rules
+select = [ "ALL" ]
