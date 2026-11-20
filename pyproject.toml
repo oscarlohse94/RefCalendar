@@ -10,6 +10,9 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "beautifulsoup4>=4.12",
+    "google-api-python-client>=2.150",
+    "google-auth-httplib2>=0.2",
+    "google-auth-oauthlib>=1.2",
     "python-dotenv>=1.0",
     "requests>=2.31",
 ]
@@ -23,6 +26,7 @@ py-modules = [
     "game_to_json",
     "get_games",
     "html_to_data",
+    "json_to_google",
     "main",
 ]
 
