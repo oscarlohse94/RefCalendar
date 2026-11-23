@@ -3,18 +3,45 @@ Automation to add the RefSoft appointments to the google calendar
 
 ## Installation
 
-On Linux, WSL, or macOS, run the setup script from the repository:
+### Windows
+
+Installiere zuerst Python 3.10 oder neuer mit dem Python-Installer (ggf. mit
+dem `py`-Launcher und `pip`). Fuehre die Einrichtung anschlie&szlig;end in
+PowerShell aus dem Repository-Ordner aus:
+
+```bash
+. .\setup.ps1
+```
+
+Das Skript muss mit Punkt und Leerzeichen eingebunden werden, damit es
+`.venv` in der aktuellen PowerShell aktivieren kann. Falls PowerShell die
+Ausfuehrung blockiert, einmalig den aktuellen Prozess erlauben:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+Das Skript fragt nach der persoenlichen DHB-URL und erstellt oder aktualisiert
+`.env`. Die Eingabe kann mit Strg+V eingefuegt werden, wird dabei aber im
+Terminal angezeigt. Falls Strg+V in der PowerShell-Konsole nicht funktioniert,
+kopiere den Link vorher und gib an der Abfrage `CLIPBOARD` ein. Dann verwendet
+das Skript `.venv\Scripts\python.exe` und installiert das Projekt per pip.
+
+Windows-Befehle verwenden daher:
+
+```powershell
+.venv\Scripts\python.exe -m main
+.venv\Scripts\python.exe -m unittest discover -s python/tests -t python -p "test_*.py" -v
+```
+
+### Linux, WSL oder macOS
+
+Das Skript muss eingebunden werden, damit es `.venv` in der aktuellen Shell
+aktivieren kann:
 
 ```bash
 source ./setup.sh
 ```
-
-The script must be sourced so it can activate `.venv` in the current shell.
-It asks for the personal DHB URL without echoing it: enter a new URL to update
-`.env`, or press Enter to keep the current value. If `.env` does not exist, a
-URL is required to create it with owner-only permissions. An existing valid
-`.venv` is reused; otherwise, the script creates it without bootstrapping
-`pip` and installs the project dependencies into it.
 
 ## Preview calendar JSON
 
@@ -23,6 +50,12 @@ print a formatted JSON array of Google Calendar events:
 
 ```bash
 .venv/bin/python -m main
+```
+
+On Windows:
+
+```powershell
+.venv\Scripts\python.exe -m main
 ```
 
 The output includes referee names and available contact details. Treat it as
@@ -40,6 +73,12 @@ personal data when copying, saving, or sharing the console output.
    .venv/bin/python -m main --test-google-login
    ```
 
+   On Windows:
+
+   ```powershell
+   .venv\Scripts\python.exe -m main --test-google-login
+   ```
+
    On first run, open the authorization URL printed in the terminal in your
    browser and authorize RefCalendar. The refresh token is stored locally in
    `token.json`, also ignored by Git. The test only requests up to one event ID
@@ -49,6 +88,12 @@ personal data when copying, saving, or sharing the console output.
 
    ```bash
    .venv/bin/python -m main --sync-calendar
+   ```
+
+   On Windows:
+
+   ```powershell
+   .venv\Scripts\python.exe -m main --sync-calendar
    ```
 
 The sync targets the primary calendar. Events use a stable Google event ID
@@ -63,6 +108,12 @@ the repository root:
 
 ```bash
 .venv/bin/python -m unittest discover -s python/tests -t python -p 'test_*.py' -v
+```
+
+On Windows:
+
+```powershell
+.venv\Scripts\python.exe -m unittest discover -s python/tests -t python -p "test_*.py" -v
 ```
 
 The `python/tests` directory groups tests by component. For example,
