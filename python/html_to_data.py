@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Oscar Lohse
+
 """Parse DHB assignment HTML into RefCalendar data."""
 
 from __future__ import annotations
@@ -6,7 +8,7 @@ import re
 from collections import Counter
 
 from bs4 import BeautifulSoup, Tag
-from game_data import Game, Referee
+from game_data import Game, Referee, User
 
 
 class GameParseError(RuntimeError):
@@ -15,6 +17,7 @@ class GameParseError(RuntimeError):
 
 _LABEL_SPACE_RE = re.compile(r"\s+")
 _MIN_TABLE_CELLS = 2
+_USER_NAME_PREFIX = "Mobiler Einsatzplan von"
 _REFEREE_ROLES = {
     "sr1": "SR1",
     "sr2": "SR2",
@@ -175,6 +178,30 @@ def _parse_match_item(item: Tag) -> Game | None:
         away_team=away_team,
         location=location,
         referee=referees,
+    )
+
+
+def parse_user(html: str) -> User:
+    """Parse user information from a DHB HTML response."""
+    soup = BeautifulSoup(html, "html.parser")
+    name_tag = soup.select_one("#dhb-main-content .alert.alert-primary")
+    link_tag = soup.select_one("div.accordion-header a[href]")
+
+    heading = _clean_text(name_tag.get_text(" ", strip=True)) if name_tag else None
+    if not heading or not heading.startswith(_USER_NAME_PREFIX):
+        msg = "Der Schiedsrichtername wurde in der DHB-Seite nicht gefunden."
+        raise GameParseError(msg)
+    name = _clean_text(heading[len(_USER_NAME_PREFIX) :])
+    if not name:
+        msg = "Der Schiedsrichtername fehlt in der DHB-Seite."
+        raise GameParseError(msg)
+
+    link = _clean_text(link_tag.get("href")) if link_tag else None
+
+    return User(
+        name=name,
+        link=link,
+        games=parse_games(html),
     )
 
 

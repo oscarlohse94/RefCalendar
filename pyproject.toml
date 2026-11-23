@@ -29,6 +29,8 @@ py-modules = [
     "html_to_data",
     "json_to_google",
     "main",
+    "desktop_app",
+    "user_cache",
 ]
 
 [tool.ruff]

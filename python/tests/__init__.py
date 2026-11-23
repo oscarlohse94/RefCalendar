@@ -1,1 +1,3 @@
+# Copyright (c) 2026 Oscar Lohse
+
 """RefCalendar test suite."""

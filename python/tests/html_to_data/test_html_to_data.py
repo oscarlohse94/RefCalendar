@@ -1,6 +1,8 @@
+# Copyright (c) 2026 Oscar Lohse
+
 import unittest
 
-from html_to_data import parse_games
+from html_to_data import GameParseError, parse_games, parse_user
 
 
 def _game_html(
@@ -97,6 +99,31 @@ class ParseGamesTests(unittest.TestCase):
             "40235 Düsseldorf\n"
             "Deutschland",
         )
+
+    def test_parse_user_extracts_name_and_games_from_same_html(self) -> None:
+        html = f"""
+        <main>
+          <div id="dhb-main-content">
+            <div class="alert alert-primary">
+              Mobiler Einsatzplan von<br>Oscar Lohse
+            </div>
+            <div class="accordion-header">
+              <a href="/personal">Persönlicher Link</a>
+            </div>
+            {_game_html()}
+          </div>
+        </main>
+        """
+
+        user = parse_user(html)
+
+        self.assertEqual(user.name, "Oscar Lohse")
+        self.assertEqual(user.link, "/personal")
+        self.assertEqual([game.game_id for game in user.games], [424242])
+
+    def test_parse_user_rejects_missing_name_header(self) -> None:
+        with self.assertRaisesRegex(GameParseError, "Schiedsrichtername"):
+            parse_user(f"<main>{_game_html()}</main>")
 
 
 if __name__ == "__main__":

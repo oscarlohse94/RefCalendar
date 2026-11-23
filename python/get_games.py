@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Oscar Lohse
+
 """Fetch the personal DHB page as HTML."""
 
 from __future__ import annotations

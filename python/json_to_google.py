@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Oscar Lohse
+
 """Synchronize RefCalendar events with the user's primary Google Calendar."""
 
 from __future__ import annotations
@@ -29,12 +31,16 @@ class GoogleCalendarSyncError(RuntimeError):
     """Raised when Google Calendar authorization or synchronization fails."""
 
 
-def _run_oauth_flow(flow: InstalledAppFlow) -> Credentials:
+def _run_oauth_flow(
+    flow: InstalledAppFlow,
+    *,
+    open_browser: bool = False,
+) -> Credentials:
     flow_logger = logging.getLogger("google_auth_oauthlib.flow")
     previous_level = flow_logger.level
     flow_logger.setLevel(logging.WARNING)
     try:
-        return flow.run_local_server(port=0, open_browser=False)
+        return flow.run_local_server(port=0, open_browser=open_browser)
     finally:
         flow_logger.setLevel(previous_level)
 
@@ -54,7 +60,7 @@ def _save_credentials(credentials: Credentials) -> None:
             os.unlink(temporary_path)
 
 
-def _load_credentials() -> Credentials:
+def _load_credentials(*, open_browser: bool = False) -> Credentials:
     credentials = None
     if _TOKEN_FILE.is_file():
         try:
@@ -88,7 +94,7 @@ def _load_credentials() -> Credentials:
                 str(_OAUTH_CLIENT_FILE),
                 _SCOPES,
             )
-            credentials = _run_oauth_flow(flow)
+            credentials = _run_oauth_flow(flow, open_browser=open_browser)
         except (OSError, ValueError, GoogleAuthError) as exc:
             msg = f"Google OAuth authorization failed ({type(exc).__name__})."
             raise GoogleCalendarSyncError(msg) from None
@@ -106,8 +112,8 @@ def _calendar_api_error(operation: str, error: HttpError) -> GoogleCalendarSyncE
     )
 
 
-def _build_calendar_service() -> Resource:
-    credentials = _load_credentials()
+def _build_calendar_service(*, open_browser: bool = False) -> Resource:
+    credentials = _load_credentials(open_browser=open_browser)
     return build(
         "calendar",
         "v3",
@@ -181,7 +187,9 @@ def _upsert_events(
 
 def sync_google_calendar_events(
     events: list[GoogleCalendarEvent],
+    *,
+    open_browser: bool = False,
 ) -> tuple[int, int]:
     """Create missing events and update existing ones in the primary calendar."""
-    service = _build_calendar_service()
+    service = _build_calendar_service(open_browser=open_browser)
     return _upsert_events(service, events)

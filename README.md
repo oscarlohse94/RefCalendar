@@ -61,12 +61,29 @@ On Windows:
 The output includes referee names and available contact details. Treat it as
 personal data when copying, saving, or sharing the console output.
 
+## Desktop UI prototype
+
+Start the initial Windows interface from the repository root:
+
+```powershell
+.\.venv\Scripts\python.exe -m desktop_app
+```
+
+In this draft, saving a DHB link fetches its page, detects the referee name,
+stores both values in `.env`, and displays the parsed games. The last parsed
+games are cached per Windows user under `%LOCALAPPDATA%\RefCalendar` and shown
+again when the app starts. Sync fetches the latest DHB data and updates Google
+Calendar in the background. Google connection management, disconnect, and
+autostart controls are still placeholders.
+
 ## Sync to Google Calendar
 
 1. In Google Cloud, enable the Google Calendar API and create an OAuth client
    with application type **Desktop app**.
-2. Save the downloaded client file as `credentials.json` in the repository
-   root. This file is ignored by Git.
+2. Save the OAuth client configuration as `credentials.json` in the repository
+   root. If the Console does not offer a JSON download, add a new client secret
+   and create the standard Desktop app JSON configuration manually. This file
+   is ignored by Git and must be kept private.
 3. Test the login and read access without changing calendar data:
 
    ```bash

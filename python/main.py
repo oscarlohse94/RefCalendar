@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Oscar Lohse
+
 """RefCalendar prototype: fetch DHB games and export them as JSON."""
 
 from __future__ import annotations
@@ -19,9 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="DHB-Spielansetzungen auslesen und als Kalendertermine vorbereiten."
-    )
+    parser = argparse.ArgumentParser(description="DHB-Spielansetzungen auslesen und als Kalendertermine vorbereiten.")
     google_actions = parser.add_mutually_exclusive_group()
     google_actions.add_argument(
         "--test-google-login",
@@ -43,9 +43,7 @@ def main() -> int:
     try:
         if args.test_google_login:
             test_google_calendar_access()
-            logger.info(
-                "Google-OAuth und Lesezugriff auf den primären Kalender sind erfolgreich."
-            )
+            logger.info("Google-OAuth und Lesezugriff auf den primären Kalender sind erfolgreich.")
             return 0
 
         load_environment()
@@ -62,9 +60,9 @@ def main() -> int:
                 updated,
             )
         else:
-            print(json.dumps(calendar_events, ensure_ascii=False, indent=2))
+            print(json.dumps(calendar_events, ensure_ascii=False, indent=2))  # noqa: T201
 
-    except (OSError, RuntimeError, ValueError) as exc:
+    except (OSError, RuntimeError, ValueError):
         logger.exception("Abbruch")
         return 1
     else:

@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Oscar Lohse
+
 import unittest
 
 from game_data import Game, Referee

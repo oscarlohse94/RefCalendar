@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Oscar Lohse
+
 import logging
 import unittest
 from types import SimpleNamespace
@@ -115,6 +117,21 @@ class GoogleCalendarSyncTests(unittest.TestCase):
         self.assertEqual(result, "credentials")
         self.assertEqual(flow.options, (0, False))
         self.assertEqual(logger.level, previous_level)
+
+    def test_oauth_flow_can_open_browser_for_desktop_app(self) -> None:
+        class FakeFlow:
+            options = None
+
+            def run_local_server(self, *, port: int, open_browser: bool) -> str:
+                self.options = (port, open_browser)
+                return "credentials"
+
+        flow = FakeFlow()
+
+        result = _run_oauth_flow(flow, open_browser=True)
+
+        self.assertEqual(result, "credentials")
+        self.assertEqual(flow.options, (0, True))
 
     @patch("json_to_google._build_calendar_service")
     def test_calendar_access_check_reads_only_one_event_id(

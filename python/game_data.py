@@ -1,3 +1,7 @@
+# Copyright (c) 2026 Oscar Lohse
+
+"""Data classes for DHB games, referees, and users."""
+
 from dataclasses import dataclass, field
 
 
@@ -28,6 +32,6 @@ class Game:
 class User:
     """Represents a user of this tool."""
 
+    name: str
     link: str
-    google_calendar: str
     games: list[Game] = field(default_factory=list)

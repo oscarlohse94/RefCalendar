@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Oscar Lohse
 
 """Convert RefCalendar games to Google Calendar event resources."""
 
