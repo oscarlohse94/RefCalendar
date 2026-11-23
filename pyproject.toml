@@ -22,6 +22,7 @@ authors = [{ name = "Oscar Lohse", email = "oscarlohse@gmx.de" }]
 [tool.setuptools]
 package-dir = {"" = "python"}
 py-modules = [
+    "app_paths",
     "env_handler",
     "game_data",
     "game_to_json",

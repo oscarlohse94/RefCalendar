@@ -15,7 +15,7 @@ class EnvironmentHandlerTests(unittest.TestCase):
     def test_set_dhb_url_preserves_other_settings_and_updates_environment(self) -> None:
         dhb_url = "https://dhb.refsoft.de/api/index.php?m=private-link"
         with tempfile.TemporaryDirectory() as temporary_directory:
-            env_file = Path(temporary_directory) / ".env"
+            env_file = Path(temporary_directory) / "config.env"
             env_file.write_text("REFEREE_NAME=Alex Example\n", encoding="utf-8")
 
             with (
@@ -40,7 +40,7 @@ class EnvironmentHandlerTests(unittest.TestCase):
 
     def test_set_referee_name_preserves_other_settings_and_updates_environment(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
-            env_file = Path(temporary_directory) / ".env"
+            env_file = Path(temporary_directory) / "config.env"
             env_file.write_text("DHB_URL=https://dhb.refsoft.de/api/index.php?m=existing\n", encoding="utf-8")
 
             with (

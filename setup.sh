@@ -7,11 +7,26 @@ fi
 
 _refcalendar_private_setup() {
     local root_dir="$1"
-    local env_file="$root_dir/.env"
+    local config_directory=""
+    local env_file=""
     local venv_dir="$root_dir/.venv"
     local dhb_url=""
     local pip_help=""
     local python_cmd=""
+
+    case "$(uname -s)" in
+        Darwin*)
+            config_directory="$HOME/Library/Application Support/RefCalendar"
+            ;;
+        *)
+            config_directory="${XDG_CONFIG_HOME:-$HOME/.config}/refcalendar"
+            ;;
+    esac
+    env_file="$config_directory/config.env"
+    if ! mkdir -p "$config_directory"; then
+        printf 'Fehler: RefCalendar-Benutzerordner konnte nicht erstellt werden.\n' >&2
+        return 1
+    fi
 
     if ! command -v python3 >/dev/null 2>&1; then
         printf 'Fehler: python3 wurde nicht gefunden.\n' >&2
@@ -60,7 +75,7 @@ _refcalendar_private_setup() {
 
     if [[ -n "$dhb_url" ]]; then
         if [[ ! "$dhb_url" =~ ^https://dhb\.refsoft\.de/api/index\.php\?m=.+$ ]]; then
-            printf 'Fehler: Die URL hat nicht das erwartete DHB-Format. Die .env-Datei blieb unverändert.\n' >&2
+            printf 'Fehler: Die URL hat nicht das erwartete DHB-Format. Die Konfigurationsdatei blieb unverändert.\n' >&2
             return 1
         fi
 
@@ -104,14 +119,14 @@ finally:
         os.unlink(temp_name)
 PY
         then
-            printf 'Fehler: Die DHB-URL konnte nicht in .env gespeichert werden.\n' >&2
+            printf 'Fehler: Die DHB-URL konnte nicht in der Benutzerkonfiguration gespeichert werden.\n' >&2
             return 1
         fi
-        printf 'DHB-URL in .env aktualisiert.\n'
+        printf 'DHB-URL in Benutzerkonfiguration aktualisiert.\n'
     elif [[ -e "$env_file" ]]; then
         printf 'Bisherige DHB-URL bleibt unverändert.\n'
     else
-        printf 'Fehler: Ohne eine DHB-URL kann keine .env-Datei erstellt werden.\n' >&2
+        printf 'Fehler: Ohne eine DHB-URL kann keine Konfigurationsdatei erstellt werden.\n' >&2
         return 1
     fi
 

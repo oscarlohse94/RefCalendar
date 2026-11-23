@@ -3,17 +3,25 @@
 """For Handling the environment variables related to the DHB RefSoft URL."""
 
 import os
-from pathlib import Path
 
+from app_paths import CONFIG_FILE
 from dotenv import load_dotenv, set_key
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[1]
-_ENV_FILE = _PROJECT_ROOT / ".env"
+_ENV_FILE = CONFIG_FILE
 _DHB_URL_PREFIX = "https://dhb.refsoft.de/api/index.php?m="
 
 
+def _prepare_config_file() -> None:
+    try:
+        _ENV_FILE.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        msg = "Der RefCalendar-Benutzerordner konnte nicht vorbereitet werden."
+        raise OSError(msg) from exc
+
+
 def load_environment() -> None:
-    """Load variables from the project's local .env file."""
+    """Load the per-user RefCalendar configuration."""
+    _prepare_config_file()
     load_dotenv(_ENV_FILE)
 
 
@@ -27,6 +35,7 @@ def validate_dhb_url(dhb_url: str) -> str:
 
 
 def _set_environment_value(key: str, value: str) -> None:
+    _prepare_config_file()
     saved, _, _ = set_key(
         str(_ENV_FILE),
         key,
@@ -34,7 +43,7 @@ def _set_environment_value(key: str, value: str) -> None:
         quote_mode="always",
     )
     if not saved:
-        msg = "Die .env-Datei konnte nicht aktualisiert werden."
+        msg = "Die Benutzerkonfiguration konnte nicht aktualisiert werden."
         raise OSError(msg)
     os.environ[key] = value
 
@@ -43,7 +52,7 @@ def get_dhb_url() -> str:
     """Retrieve the DHB RefSoft URL from the environment variables."""
     dhb_url = os.getenv("DHB_URL", "")
     if not dhb_url.strip():
-        msg = "RefSoft-URL fehlt. Lege eine lokale .env-Datei an und trage dort deinen persönlichen Link ein."
+        msg = "RefSoft-URL fehlt. Trage deinen persönlichen Link in der RefCalendar-Konfiguration ein."
         raise RuntimeError(msg)
     try:
         return validate_dhb_url(dhb_url)

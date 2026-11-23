@@ -130,7 +130,7 @@ class RefCalendarWindow:
         """Build the referee, calendar, and sync status section."""
         status_frame = ttk.LabelFrame(container, text="Status", padding=14)
         status_frame.pack(fill="x", pady=(16, 0))
-        referee_status = referee_name or "Noch nicht in .env hinterlegt"
+        referee_status = referee_name or "Noch nicht eingerichtet"
         self.referee_status = tk.StringVar(value=referee_status)
         self.link_status = tk.StringVar(
             value="DHB-Link ist hinterlegt"

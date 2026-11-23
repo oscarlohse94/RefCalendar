@@ -6,8 +6,14 @@ if ($MyInvocation.InvocationName -ne ".") {
 }
 
 $rootDir = $PSScriptRoot
-$envFile = Join-Path $rootDir ".env"
+if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+    throw "Der Windows-Benutzerordner LOCALAPPDATA konnte nicht ermittelt werden."
+}
+$configDirectory = Join-Path $env:LOCALAPPDATA "RefCalendar"
+$envFile = Join-Path $configDirectory "config.env"
 $venvDir = Join-Path $rootDir ".venv"
+
+New-Item -ItemType Directory -Path $configDirectory -Force | Out-Null
 
 $pythonCommand = $null
 $pythonArguments = @()
@@ -66,7 +72,7 @@ if ($dhbUrl -eq "CLIPBOARD") {
 if (-not [string]::IsNullOrWhiteSpace($dhbUrl)) {
     if ($dhbUrl -notmatch '^https://dhb\.refsoft\.de/api/index\.php\?m=.+$') {
         $dhbUrl = $null
-        throw "Die URL hat nicht das erwartete DHB-Format. Die .env-Datei blieb unveraendert."
+        throw "Die URL hat nicht das erwartete DHB-Format. Die Konfigurationsdatei blieb unveraendert."
     }
 
     $existingLines = if (Test-Path $envFile) {
@@ -93,12 +99,12 @@ if (-not [string]::IsNullOrWhiteSpace($dhbUrl)) {
     $utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllLines($envFile, [string[]]$updatedLines, $utf8WithoutBom)
     $dhbUrl = $null
-    Write-Host "DHB-URL in .env aktualisiert."
+    Write-Host "DHB-URL in $envFile aktualisiert."
 } elseif (Test-Path $envFile) {
     Write-Host "Bisherige DHB-URL bleibt unveraendert."
 } else {
     $dhbUrl = $null
-    throw "Ohne eine DHB-URL kann keine .env-Datei erstellt werden."
+    throw "Ohne eine DHB-URL kann keine Konfigurationsdatei erstellt werden."
 }
 
 $venvPython = Join-Path $venvDir "Scripts\python.exe"

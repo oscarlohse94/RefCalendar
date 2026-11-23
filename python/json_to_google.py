@@ -10,6 +10,7 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from app_paths import PROJECT_ROOT, TOKEN_FILE
 from google.auth.exceptions import GoogleAuthError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -20,11 +21,13 @@ from googleapiclient.errors import HttpError
 if TYPE_CHECKING:
     from game_to_json import GoogleCalendarEvent
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_PROJECT_ROOT = PROJECT_ROOT
 _OAUTH_CLIENT_FILE = _PROJECT_ROOT / "credentials.json"
-_TOKEN_FILE = _PROJECT_ROOT / "token.json"
+_TOKEN_FILE = TOKEN_FILE
 _CALENDAR_ID = "primary"
 _SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
+_HTTP_NOT_FOUND = 404
+_HTTP_CONFLICT = 409
 
 
 class GoogleCalendarSyncError(RuntimeError):
@@ -46,18 +49,20 @@ def _run_oauth_flow(
 
 
 def _save_credentials(credentials: Credentials) -> None:
-    file_descriptor, temporary_path = tempfile.mkstemp(
+    _TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
+    file_descriptor, temporary_name = tempfile.mkstemp(
         prefix=".token-",
-        dir=_PROJECT_ROOT,
+        dir=_TOKEN_FILE.parent,
         text=True,
     )
+    temporary_path = Path(temporary_name)
     try:
         with os.fdopen(file_descriptor, "w", encoding="utf-8") as token_file:
             token_file.write(credentials.to_json())
-        os.replace(temporary_path, _TOKEN_FILE)
+        temporary_path.replace(_TOKEN_FILE)
     finally:
-        if os.path.exists(temporary_path):
-            os.unlink(temporary_path)
+        if temporary_path.exists():
+            temporary_path.unlink()
 
 
 def _load_credentials(*, open_browser: bool = False) -> Credentials:
@@ -69,9 +74,9 @@ def _load_credentials(*, open_browser: bool = False) -> Credentials:
                 _SCOPES,
             )
         except (OSError, ValueError) as exc:
-            msg = "Google OAuth token file is invalid. Remove token.json and authorize again."
+            msg = "Google OAuth token file is invalid. Remove the per-user token and authorize again."
             raise GoogleCalendarSyncError(msg) from exc
-        os.chmod(_TOKEN_FILE, 0o600)
+        _TOKEN_FILE.chmod(0o600)
 
     if credentials is not None and credentials.valid:
         return credentials
@@ -107,9 +112,7 @@ def _load_credentials(*, open_browser: bool = False) -> Credentials:
 
 
 def _calendar_api_error(operation: str, error: HttpError) -> GoogleCalendarSyncError:
-    return GoogleCalendarSyncError(
-        f"Google Calendar {operation} failed (HTTP {error.resp.status})."
-    )
+    return GoogleCalendarSyncError(f"Google Calendar {operation} failed (HTTP {error.resp.status}).")
 
 
 def _build_calendar_service(*, open_browser: bool = False) -> Resource:
@@ -132,7 +135,8 @@ def test_google_calendar_access() -> None:
             fields="items(id)",
         ).execute()
     except HttpError as exc:
-        raise _calendar_api_error("access check", exc) from None
+        msg = "access check"
+        raise _calendar_api_error(msg, exc) from None
 
 
 def _patch_event(
@@ -146,7 +150,8 @@ def _patch_event(
             body={key: value for key, value in event.items() if key != "id"},
         ).execute()
     except HttpError as exc:
-        raise _calendar_api_error("patch", exc) from None
+        msg = "patch"
+        raise _calendar_api_error(msg, exc) from None
 
 
 def _upsert_events(
@@ -164,16 +169,18 @@ def _upsert_events(
                 eventId=event_id,
             ).execute()
         except HttpError as exc:
-            if exc.resp.status != 404:
-                raise _calendar_api_error("lookup", exc) from None
+            if exc.resp.status != _HTTP_NOT_FOUND:
+                msg = "lookup"
+                raise _calendar_api_error(msg, exc) from None
             try:
                 service.events().insert(
                     calendarId=_CALENDAR_ID,
                     body=event,
                 ).execute()
             except HttpError as insert_error:
-                if insert_error.resp.status != 409:
-                    raise _calendar_api_error("insert", insert_error) from None
+                if insert_error.resp.status != _HTTP_CONFLICT:
+                    msg_0 = "insert"
+                    raise _calendar_api_error(msg_0, insert_error) from None
                 _patch_event(service, event)
                 updated += 1
             else:
