@@ -9,6 +9,24 @@ from game_data import Game, User
 
 
 class DesktopAppTests(unittest.TestCase):
+    def test_sync_requires_a_connected_google_account(self) -> None:
+        window = RefCalendarWindow.__new__(RefCalendarWindow)
+        window.root = Mock()
+        window._google_connected = False
+
+        with (
+            patch("desktop_app.messagebox.showwarning") as showwarning,
+            patch("desktop_app.get_dhb_url") as get_dhb_url,
+        ):
+            window._sync_with_google()
+
+        showwarning.assert_called_once_with(
+            "Google-Konto nicht verknüpft",
+            "Verknüpfe zuerst dein Google-Konto.",
+            parent=window.root,
+        )
+        get_dhb_url.assert_not_called()
+
     def test_displays_game_fields_in_the_games_table(self) -> None:
         window = RefCalendarWindow.__new__(RefCalendarWindow)
         window.games_tree = Mock()
@@ -65,7 +83,7 @@ class DesktopAppTests(unittest.TestCase):
         save_cache.assert_called_once_with(user, source_url)
         save_name.assert_called_once_with(user.name)
         convert.assert_called_once_with(user.games)
-        sync.assert_called_once_with([], open_browser=True)
+        sync.assert_called_once_with([], allow_authorization=False)
 
 
 if __name__ == "__main__":

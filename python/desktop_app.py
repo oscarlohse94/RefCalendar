@@ -10,7 +10,7 @@ from datetime import datetime
 from queue import Empty, Queue
 from threading import Thread
 from tkinter import messagebox, ttk
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from env_handler import (
     get_dhb_url,
@@ -27,7 +27,13 @@ from env_handler import (
 from game_to_json import games_to_google_calendar_events
 from get_games import fetch_html
 from html_to_data import parse_user
-from json_to_google import sync_google_calendar_events
+from json_to_google import (
+    connect_google_account,
+    disconnect_google_account,
+    get_google_account_email,
+    has_google_credentials,
+    sync_google_calendar_events,
+)
 from user_cache import UserCacheError, load_user_cache, save_user_cache
 
 if TYPE_CHECKING:
@@ -50,6 +56,20 @@ class _SyncFailure:
     source_url: str
 
 
+@dataclass(frozen=True)
+class _GoogleAccountSuccess:
+    action: Literal["check", "connect", "disconnect"]
+    email: str | None = None
+    warning: str | None = None
+
+
+@dataclass(frozen=True)
+class _GoogleAccountFailure:
+    action: Literal["check", "connect", "disconnect"]
+    message: str
+    has_credentials: bool
+
+
 class RefCalendarWindow:
     """Render the first desktop UI draft."""
 
@@ -57,7 +77,12 @@ class RefCalendarWindow:
         """Initialize the application window and load its cached user."""
         self.root = root
         self.user: User | None = None
+        self._google_connected = False
+        self._google_credentials_available = False
+        self._google_operation: Literal["check", "connect", "disconnect"] | None = None
+        self._sync_in_progress = False
         self._sync_results: Queue[_SyncSuccess | _SyncFailure] = Queue()
+        self._google_results: Queue[_GoogleAccountSuccess | _GoogleAccountFailure] = Queue()
         load_environment()
         referee_name = get_referee_name()
         try:
@@ -68,6 +93,7 @@ class RefCalendarWindow:
         self.show_link_var = tk.BooleanVar(value=False)
         self._build_window(root, referee_name, dhb_url)
         self._load_cached_user(dhb_url)
+        self._start_google_operation("check")
 
     def _build_window(self, root: tk.Tk, referee_name: str, dhb_url: str) -> None:
         """Build the window layout."""
@@ -139,9 +165,13 @@ class RefCalendarWindow:
         )
         ttk.Label(status_frame, textvariable=self.referee_status).pack(anchor="w")
         ttk.Label(status_frame, textvariable=self.link_status).pack(anchor="w", pady=(6, 0))
-        self.google_status = tk.StringVar(value="Google-Konto: Noch nicht verbunden")
-        ttk.Label(status_frame, textvariable=self.google_status).pack(anchor="w", pady=(6, 0))
-        self.sync_status = tk.StringVar(value="Noch keine")
+        self.google_status = tk.StringVar(value="Google-Konto: Verbindung wird geprüft …")
+        ttk.Label(
+            status_frame,
+            textvariable=self.google_status,
+            wraplength=900,
+        ).pack(anchor="w", pady=(6, 0))
+        self.sync_status = tk.StringVar(value="Noch keine Synchronisierung")
         ttk.Label(status_frame, textvariable=self.sync_status).pack(anchor="w", pady=(6, 0))
 
     def _build_games_section(self, container: ttk.Frame) -> None:
@@ -192,21 +222,30 @@ class RefCalendarWindow:
         table_frame.columnconfigure(0, weight=1)
 
     def _build_actions(self, container: ttk.Frame) -> None:
-        """Build sync and future-feature controls."""
+        """Build Google account and calendar controls."""
         actions = ttk.Frame(container)
         actions.pack(fill="x", pady=(18, 0))
+        self.google_connect_button = ttk.Button(
+            actions,
+            text="Google-Konto verknüpfen",
+            command=self._connect_google_account,
+            state="disabled",
+        )
+        self.google_connect_button.pack(side="left")
+        self.google_disconnect_button = ttk.Button(
+            actions,
+            text="Google-Konto trennen",
+            command=self._disconnect_google_account,
+            state="disabled",
+        )
+        self.google_disconnect_button.pack(side="left", padx=(8, 0))
         self.sync_button = ttk.Button(
             actions,
-            text="Sync with Google",
+            text="Mit Google synchronisieren",
             command=self._sync_with_google,
             state="disabled",
         )
-        self.sync_button.pack(side="left")
-        ttk.Button(
-            actions,
-            text="DeSync Google",
-            state="disabled",
-        ).pack(side="left", padx=(8, 0))
+        self.sync_button.pack(side="left", padx=(8, 0))
 
         self.autostart_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
@@ -216,14 +255,154 @@ class RefCalendarWindow:
             state="disabled",
         ).pack(anchor="w", pady=(16, 0))
 
-        ttk.Label(
-            container,
-            text="Entwurf: Google-Kontoverwaltung und Autostart folgen.",
-            wraplength=500,
-        ).pack(anchor="w", pady=(14, 0))
-
     def _toggle_link_visibility(self) -> None:
         self.link_entry.configure(show="" if self.show_link_var.get() else "*")
+
+    def _update_google_controls(self) -> None:
+        busy = self._google_operation is not None or self._sync_in_progress
+        self.google_connect_button.configure(
+            state="disabled" if busy or self._google_connected else "normal",
+        )
+        self.google_disconnect_button.configure(
+            state="normal" if not busy and self._google_credentials_available else "disabled",
+        )
+        self.sync_button.configure(
+            state=(
+                "normal"
+                if self.user is not None and self._google_connected and not self._sync_in_progress
+                else "disabled"
+            ),
+        )
+
+    def _start_google_operation(
+        self,
+        action: Literal["check", "connect", "disconnect"],
+    ) -> None:
+        self._google_operation = action
+        if action == "connect":
+            self.google_status.set("Google-Konto wird verknüpft …")
+        elif action == "disconnect":
+            self.google_status.set("Google-Konto wird getrennt …")
+        self._update_google_controls()
+        Thread(
+            target=self._google_account_worker,
+            args=(action,),
+            daemon=True,
+        ).start()
+        self.root.after(100, self._poll_google_results)
+
+    def _google_account_worker(
+        self,
+        action: Literal["check", "connect", "disconnect"],
+    ) -> None:
+        try:
+            if action == "check":
+                email = get_google_account_email()
+                self._google_results.put(
+                    _GoogleAccountSuccess(
+                        action=action,
+                        email=email,
+                    ),
+                )
+            elif action == "connect":
+                email = connect_google_account()
+                self._google_results.put(
+                    _GoogleAccountSuccess(
+                        action=action,
+                        email=email,
+                    ),
+                )
+            else:
+                warning = disconnect_google_account()
+                self._google_results.put(
+                    _GoogleAccountSuccess(
+                        action=action,
+                        warning=warning,
+                    ),
+                )
+        except (OSError, RuntimeError, ValueError) as exc:
+            self._google_results.put(
+                _GoogleAccountFailure(
+                    action=action,
+                    message=str(exc),
+                    has_credentials=has_google_credentials(),
+                ),
+            )
+
+    def _poll_google_results(self) -> None:
+        try:
+            result = self._google_results.get_nowait()
+        except Empty:
+            self.root.after(100, self._poll_google_results)
+            return
+
+        self._google_operation = None
+        if isinstance(result, _GoogleAccountFailure):
+            if result.action == "check":
+                self._google_connected = False
+                self._google_credentials_available = result.has_credentials
+                self.google_status.set(
+                    f"Google-Konto: Verbindung nicht bestätigt. {result.message}",
+                )
+            else:
+                self.google_status.set(
+                    f"Google-Konto: Vorgang fehlgeschlagen. {result.message}",
+                )
+                messagebox.showerror(
+                    "Google-Konto",
+                    result.message,
+                    parent=self.root,
+                )
+            self._update_google_controls()
+            return
+
+        if result.action == "disconnect":
+            self._google_connected = False
+            self._google_credentials_available = False
+            if result.warning:
+                self.google_status.set(
+                    "Google-Konto: Lokal getrennt; Widerruf bei Google nicht bestätigt.",
+                )
+                messagebox.showwarning(
+                    "Google-Konto lokal getrennt",
+                    f"Die lokale Anmeldung wurde gelöscht, aber die Berechtigung bei Google konnte nicht sicher widerrufen werden.\n\n{result.warning}",
+                    parent=self.root,
+                )
+            else:
+                self.google_status.set("Google-Konto: Nicht verbunden")
+                messagebox.showinfo(
+                    "Google-Konto getrennt",
+                    "Das Konto wurde getrennt und die Berechtigung bei Google widerrufen.",
+                    parent=self.root,
+                )
+        elif result.email:
+            self._google_connected = True
+            self._google_credentials_available = True
+            self.google_status.set(f"Google-Konto: {result.email}")
+            if result.action == "connect":
+                messagebox.showinfo(
+                    "Google-Konto verknüpft",
+                    f"Das Google-Konto {result.email} wurde erfolgreich verknüpft.",
+                    parent=self.root,
+                )
+        else:
+            self._google_connected = False
+            self._google_credentials_available = False
+            self.google_status.set("Google-Konto: Nicht verbunden")
+
+        self._update_google_controls()
+
+    def _connect_google_account(self) -> None:
+        self._start_google_operation("connect")
+
+    def _disconnect_google_account(self) -> None:
+        if not messagebox.askyesno(
+            "Google-Konto trennen",
+            "Möchtest du das Google-Konto trennen? Die lokale Anmeldung wird gelöscht und die Berechtigung bei Google widerrufen.",
+            parent=self.root,
+        ):
+            return
+        self._start_google_operation("disconnect")
 
     def _display_games(self, games: list[Game]) -> None:
         for item in self.games_tree.get_children():
@@ -247,6 +426,14 @@ class RefCalendarWindow:
         self.games_status.set(f"{len(games)} Spiele geladen")
 
     def _sync_with_google(self) -> None:
+        if not self._google_connected:
+            messagebox.showwarning(
+                "Google-Konto nicht verknüpft",
+                "Verknüpfe zuerst dein Google-Konto.",
+                parent=self.root,
+            )
+            return
+
         if self.user is None:
             messagebox.showwarning(
                 "Keine Spiele geladen",
@@ -265,7 +452,8 @@ class RefCalendarWindow:
             )
             return
 
-        self.sync_button.configure(state="disabled")
+        self._sync_in_progress = True
+        self._update_google_controls()
         self.sync_status.set("Daten werden aktualisiert und synchronisiert …")
         Thread(
             target=self._sync_worker,
@@ -287,7 +475,7 @@ class RefCalendarWindow:
             calendar_events = games_to_google_calendar_events(user.games)
             created, updated = sync_google_calendar_events(
                 calendar_events,
-                open_browser=True,
+                allow_authorization=False,
             )
         except (OSError, RuntimeError, ValueError) as exc:
             self._sync_results.put(
@@ -315,10 +503,11 @@ class RefCalendarWindow:
             self.root.after(100, self._poll_sync_results)
             return
 
-        self.sync_button.configure(state="normal")
+        self._sync_in_progress = False
         if isinstance(result, _SyncFailure):
             if result.user is not None:
                 self._apply_user(result.user, result.source_url)
+            self._update_google_controls()
             self.sync_status.set("Synchronisierung fehlgeschlagen")
             messagebox.showerror(
                 "Synchronisierung fehlgeschlagen",
@@ -328,9 +517,14 @@ class RefCalendarWindow:
             return
 
         self._apply_user(result.user, result.source_url)
-        self.google_status.set("Google-Konto: Verbunden")
+        self.google_status.set(
+            self.google_status.get()
+            if self._google_connected
+            else "Google-Konto: Nicht verbunden",
+        )
         synced_at = datetime.now().astimezone().strftime("%d.%m.%Y %H:%M")
         self.sync_status.set(f"{result.created} erstellt, {result.updated} aktualisiert ({synced_at})")
+        self._update_google_controls()
         message = (
             f"{result.created} Termine erstellt und "
             f"{result.updated} Termine aktualisiert."
@@ -378,7 +572,7 @@ class RefCalendarWindow:
         self._display_games(self.user.games)
         self.greeting_var.set(f"Hallo, {self.user.name}!")
         self.referee_status.set(self.user.name)
-        self.sync_button.configure(state="normal")
+        self._update_google_controls()
         fetched_at = cached_user.fetched_at.astimezone().strftime("%d.%m.%Y %H:%M")
         self.games_status.set(f"{len(self.user.games)} gespeicherte Spiele; zuletzt geladen: {fetched_at}")
 
@@ -406,7 +600,7 @@ class RefCalendarWindow:
 
         self.link_var.set(dhb_url)
         self._apply_user(user, dhb_url)
-        self.sync_button.configure(state="normal")
+        self._update_google_controls()
         try:
             save_user_cache(user, dhb_url)
         except UserCacheError as exc:

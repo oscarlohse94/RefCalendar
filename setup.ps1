@@ -6,14 +6,7 @@ if ($MyInvocation.InvocationName -ne ".") {
 }
 
 $rootDir = $PSScriptRoot
-if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
-    throw "Der Windows-Benutzerordner LOCALAPPDATA konnte nicht ermittelt werden."
-}
-$configDirectory = Join-Path $env:LOCALAPPDATA "RefCalendar"
-$envFile = Join-Path $configDirectory "config.env"
 $venvDir = Join-Path $rootDir ".venv"
-
-New-Item -ItemType Directory -Path $configDirectory -Force | Out-Null
 
 $pythonCommand = $null
 $pythonArguments = @()
@@ -57,54 +50,6 @@ $pipHelp = & $pythonCommand @pythonArgsPrefix -m pip --help
 $pipHelpText = $pipHelp -join [Environment]::NewLine
 if ($pipHelpText -notmatch "(?m)\s--python") {
     throw "Die installierte pip-Version unterstuetzt die Option --python nicht. Aktualisiere pip mit ``py -3 -m pip install --upgrade pip``."
-}
-
-if (Test-Path $envFile) {
-    $prompt = "DHB-URL eingeben, CLIPBOARD fuer Zwischenablage oder Enter zum Beibehalten (Eingabe wird angezeigt):"
-} else {
-    $prompt = "DHB-URL eingeben oder CLIPBOARD fuer Zwischenablage (Eingabe wird angezeigt):"
-}
-$dhbUrl = Read-Host $prompt
-if ($dhbUrl -eq "CLIPBOARD") {
-    $dhbUrl = (Get-Clipboard -Raw | Out-String).Trim()
-}
-
-if (-not [string]::IsNullOrWhiteSpace($dhbUrl)) {
-    if ($dhbUrl -notmatch '^https://dhb\.refsoft\.de/api/index\.php\?m=.+$') {
-        $dhbUrl = $null
-        throw "Die URL hat nicht das erwartete DHB-Format. Die Konfigurationsdatei blieb unveraendert."
-    }
-
-    $existingLines = if (Test-Path $envFile) {
-        [System.IO.File]::ReadAllLines($envFile)
-    } else {
-        @()
-    }
-
-    $replaced = $false
-    $updatedLines = foreach ($line in $existingLines) {
-        if ($line -match '^\s*(?:export\s+)?DHB_URL\s*=') {
-            if (-not $replaced) {
-                "DHB_URL=$dhbUrl"
-                $replaced = $true
-            }
-        } else {
-            $line
-        }
-    }
-    if (-not $replaced) {
-        $updatedLines += "DHB_URL=$dhbUrl"
-    }
-
-    $utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
-    [System.IO.File]::WriteAllLines($envFile, [string[]]$updatedLines, $utf8WithoutBom)
-    $dhbUrl = $null
-    Write-Host "DHB-URL in $envFile aktualisiert."
-} elseif (Test-Path $envFile) {
-    Write-Host "Bisherige DHB-URL bleibt unveraendert."
-} else {
-    $dhbUrl = $null
-    throw "Ohne eine DHB-URL kann keine Konfigurationsdatei erstellt werden."
 }
 
 $venvPython = Join-Path $venvDir "Scripts\python.exe"

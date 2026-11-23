@@ -21,12 +21,9 @@ Ausfuehrung blockiert, einmalig den aktuellen Prozess erlauben:
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ```
 
-Das Skript fragt nach der persoenlichen DHB-URL und erstellt oder aktualisiert
-die Benutzerkonfiguration unter `%LOCALAPPDATA%\RefCalendar\config.env`. Die
-Eingabe kann mit Strg+V eingefuegt werden, wird dabei aber im
-Terminal angezeigt. Falls Strg+V in der PowerShell-Konsole nicht funktioniert,
-kopiere den Link vorher und gib an der Abfrage `CLIPBOARD` ein. Dann verwendet
-das Skript `.venv\Scripts\python.exe` und installiert das Projekt per pip.
+Das Skript richtet `.venv` ein und installiert die Abhaengigkeiten. Den
+persoenlichen DHB-Link gibst du danach im RefCalendar-Fenster ein; er wird im
+Windows-Anmeldeinformationsspeicher abgelegt.
 
 Windows-Befehle verwenden daher:
 
@@ -70,15 +67,22 @@ Start the initial Windows interface from the repository root:
 .\.venv\Scripts\python.exe -m desktop_app
 ```
 
-In this draft, saving a DHB link fetches its page, detects the referee name,
-stores both values in the per-user configuration, and displays the parsed games. The last parsed
-games are cached per Windows user under `%LOCALAPPDATA%\RefCalendar` and shown
-again when the app starts. Sync fetches the latest DHB data and updates Google
-Calendar in the background. Google connection management, disconnect, and
-autostart controls are still placeholders.
+Saving a DHB link fetches its page, detects the referee name, and displays the
+parsed games. The last parsed games are cached per Windows user under
+`%LOCALAPPDATA%\RefCalendar` and shown again when the app starts. In the app,
+**Google-Konto verknüpfen** starts authorization and displays the connected
+Google account email. **Google-Konto trennen** removes the local token and asks
+Google to revoke the app's authorization. Calendar sync runs in the background
+and is only available while a Google account is connected.
 
-The personal configuration and Google token are stored separately from the
-project under `%LOCALAPPDATA%\RefCalendar`.
+The referee name, games cache, and Google token are stored separately from the
+project under `%LOCALAPPDATA%\RefCalendar`. The personal DHB URL is stored in
+the Windows Credential Manager, not in `config.env`. If an older configuration
+still contains the URL in plaintext, the app transfers it to Credential Manager
+and removes it from `config.env` when loading the configuration.
+The Google token is stored under `%LOCALAPPDATA%\RefCalendar\token.json`.
+Because the app now also requests permission to display the account email, an
+existing Google connection may need to be linked again once.
 
 ## Sync to Google Calendar
 
