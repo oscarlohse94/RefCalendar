@@ -20,6 +20,11 @@ dependencies = [
 ]
 authors = [{ name = "Oscar Lohse", email = "oscarlohse@gmx.de" }]
 
+[project.optional-dependencies]
+packaging = [
+    "pyinstaller>=6.11",
+]
+
 [tool.setuptools]
 package-dir = {"" = "python"}
 py-modules = [

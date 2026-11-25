@@ -11,6 +11,16 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
+def get_application_directory() -> Path:
+    """Return the directory containing the app executable or source checkout."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return PROJECT_ROOT
+
+
+APPLICATION_DIRECTORY = get_application_directory()
+
+
 def _config_directory() -> Path:
     if os.name == "nt":
         local_app_data = os.environ.get("LOCALAPPDATA")

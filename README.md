@@ -84,6 +84,28 @@ The Google token is stored under `%LOCALAPPDATA%\RefCalendar\token.json`.
 Because the app now also requests permission to display the account email, an
 existing Google connection may need to be linked again once.
 
+## Build a Windows installer
+
+The installer is built on Windows and includes the Google Desktop OAuth client
+configuration. Use a dedicated client for RefCalendar; the configuration is
+copied into the installer and can be extracted from it. Desktop OAuth clients
+cannot keep an embedded client secret confidential, so do not treat it as a
+server-side secret.
+
+Install the optional packaging dependency into the project environment and
+install Inno Setup 6. Then build from the repository root:
+
+```powershell
+py -3 -m pip --python .venv\Scripts\python.exe install -e ".[packaging]"
+.\build_windows.ps1
+```
+
+The script requires `credentials.json` in the repository root and creates
+`dist\installer\RefCalendar-Setup-0.1.0.exe`. Test the installer on a clean
+Windows machine before sharing it. Uninstalling removes the application but
+preserves each user's RefCalendar settings, cached games, and Google token
+under their user profile.
+
 ## Sync to Google Calendar
 
 1. In Google Cloud, enable the Google Calendar API and create an OAuth client

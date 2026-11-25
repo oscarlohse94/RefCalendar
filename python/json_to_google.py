@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypeGuard
 
 import requests
-from app_paths import PROJECT_ROOT, TOKEN_FILE
+from app_paths import APPLICATION_DIRECTORY, TOKEN_FILE
 from google.auth.exceptions import GoogleAuthError
 from google.auth.transport.requests import AuthorizedSession, Request
 from google.oauth2.credentials import Credentials
@@ -22,8 +22,7 @@ from googleapiclient.errors import HttpError
 if TYPE_CHECKING:
     from game_to_json import GoogleCalendarEvent
 
-_PROJECT_ROOT = PROJECT_ROOT
-_OAUTH_CLIENT_FILE = _PROJECT_ROOT / "credentials.json"
+_OAUTH_CLIENT_FILE = APPLICATION_DIRECTORY / "credentials.json"
 _TOKEN_FILE = TOKEN_FILE
 _CALENDAR_ID = "primary"
 _SCOPES = [
